@@ -1,0 +1,241 @@
+================================================================
+ TOURISM PACKAGE MANAGEMENT SYSTEM
+ How to run it locally, and how to host it for free
+================================================================
+
+This project has two parts you run separately:
+
+  1. tourism-backend/   Java 17 + Spring Boot 3.3 + Spring Security (JWT)
+                        + Apache Derby (embedded, file-based database)
+  2. tourism-frontend/  React 19 + Vite + React Router + Axios
+
+They talk to each other over plain HTTP/JSON. Nothing else needs to be
+installed, downloaded, or paid for (no external database server, no
+payment gateway, no third-party API keys). Payments are simulated.
+
+----------------------------------------------------------------
+PART 1: RUNNING IT ON YOUR OWN COMPUTER
+----------------------------------------------------------------
+
+WHAT YOU NEED INSTALLED FIRST
+  - Java Development Kit (JDK) 17 or newer
+        Check with:  java -version
+  - Apache Maven 3.8+
+        Check with:  mvn -version
+        (If you don't have Maven, install it from https://maven.apache.org/
+         or via your OS package manager: e.g. "brew install maven" on Mac,
+         "sudo apt install maven" on Ubuntu/Debian, or use your IDE's
+         bundled Maven - IntelliJ and VS Code's Java extensions both
+         include one.)
+  - Node.js 18+ and npm
+        Check with:  node -v   and   npm -v
+        (Download from https://nodejs.org if needed.)
+
+You do NOT need to install Apache Derby, PostgreSQL, MySQL, Docker, or
+anything else. Derby runs embedded inside the Java process and stores
+its data as plain files on your disk.
+
+STEP 1 - Start the backend
+  1. Open a terminal and go into the backend folder:
+        cd tourism-backend
+  2. Run it:
+        mvn spring-boot:run
+     The first run will download all required libraries from Maven
+     Central, which needs an internet connection and can take a few
+     minutes. Every run after that is fast and works offline.
+  3. Wait until you see a line like:
+        Tomcat started on port 8080
+     The backend is now running at:  http://localhost:8080
+  4. On first startup, demo data is created automatically: an admin
+     account, a tour-operator account, two customer accounts, four
+     destinations, four tour packages with schedules and itineraries,
+     and two example bookings. See DEMO_CREDENTIALS.md for the full
+     list of usernames and passwords.
+  5. The database itself is a folder that gets created at
+     tourism-backend/data/tourismdb the first time you run it. Your
+     data (new users, bookings, etc.) is saved there between restarts.
+     Stop the app any time with Ctrl+C - your data is safe on disk.
+
+  Alternative way to run the backend (without "mvn spring-boot:run"):
+        cd tourism-backend
+        mvn clean package -DskipTests
+        java -jar target/tourism-backend.jar
+
+  To start completely fresh (wipe all data and reseed the demo data):
+        stop the app, then delete the tourism-backend/data folder,
+        then start the app again.
+
+STEP 2 - Start the frontend
+  1. Open a SECOND terminal (leave the backend running in the first
+     one) and go into the frontend folder:
+        cd tourism-frontend
+  2. Install its dependencies (first time only):
+        npm install
+  3. Copy the example environment file:
+        cp .env.example .env
+     By default this points the frontend at http://localhost:8080,
+     which matches the backend's default port - you shouldn't need to
+     change anything for local use.
+  4. Start the frontend:
+        npm run dev
+  5. Open the URL it prints, normally:
+        http://localhost:5173
+  6. Log in with one of the demo accounts (see DEMO_CREDENTIALS.md),
+     or click "Sign up" to create a new customer account.
+
+That's it - browsing, booking, paying (simulated), cancelling,
+reviewing, the operator package/schedule management screens, and the
+admin dashboards/reports all work end-to-end against your local
+backend.
+
+TROUBLESHOOTING
+  - "Port 8080 already in use": another program is using that port.
+    Either stop it, or run the backend on a different port:
+        mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=8081
+    and update VITE_API_BASE_URL in tourism-frontend/.env to match.
+  - "Port 5173 already in use": Vite will automatically offer the next
+    free port (5174, etc.) - just use the URL it prints.
+  - Frontend loads but API calls fail / CORS errors in the browser
+    console: make sure the backend is actually running and that
+    tourism-frontend/.env's VITE_API_BASE_URL matches the backend's
+    real address.
+  - Login fails with "Invalid username or password": double-check you
+    copied the demo credentials exactly (they are case-sensitive), or
+    that you deleted tourism-backend/data and are expecting a demo
+    account that therefore no longer exists until the backend restarts
+    and reseeds it.
+
+----------------------------------------------------------------
+PART 2: HOSTING IT ONLINE, FOR FREE (Vercel + Render)
+----------------------------------------------------------------
+
+The frontend and backend are hosted SEPARATELY:
+  - Frontend (React/Vite static site)  ->  Vercel
+  - Backend (Spring Boot Java service) ->  Render
+
+Both companies offer a free tier that's enough to demo this project.
+You'll need a free GitHub account to hold the code, since both Vercel
+and Render deploy from a Git repository.
+
+BEFORE YOU START: push this project to GitHub
+  1. Create a new, empty repository on https://github.com (e.g. named
+     "tourism-package-management-system").
+  2. From the root folder containing both tourism-backend and
+     tourism-frontend, run:
+        git init
+        git add .
+        git commit -m "Initial commit"
+        git branch -M main
+        git remote add origin https://github.com/<your-username>/<repo>.git
+        git push -u origin main
+
+--------------------------------
+STEP A - Deploy the backend to Render
+--------------------------------
+  1. Go to https://render.com and sign up / log in (GitHub login is
+     easiest).
+  2. Click "New +" -> "Web Service".
+  3. Connect your GitHub account and pick your repository.
+  4. Render needs to know the backend lives in the tourism-backend
+     subfolder and how to build/run it. A Dockerfile is already
+     included at tourism-backend/Dockerfile, which is the most
+     reliable option:
+        - Root Directory:   tourism-backend
+        - Runtime:           Docker  (Render detects the Dockerfile
+                              automatically once you set the root
+                              directory)
+     (If you'd rather not use Docker, you can instead choose the
+     "Java" native runtime with:
+        Build Command:  mvn clean package -DskipTests
+        Start Command:  java -jar target/tourism-backend.jar
+     - but Docker avoids any ambiguity about which Java version Render
+     picks, so it's the safer default here.)
+  5. Choose the "Free" instance type.
+  6. Add these Environment Variables (Render's dashboard -> your
+     service -> "Environment"):
+        APP_JWT_SECRET            = <a long random string, 32+ chars>
+        APP_CORS_ALLOWED_ORIGINS  = https://<your-vercel-app>.vercel.app
+        APP_SEED_ENABLED          = true
+     (You can generate a random secret with, e.g., `openssl rand -hex 32`
+     in a terminal, or any password generator - just don't reuse a
+     secret from anywhere else.)
+     Render automatically provides a PORT environment variable, which
+     application.properties already reads (server.port=${PORT:8080}),
+     so you don't need to set PORT yourself.
+  7. Click "Create Web Service". The first build takes a few minutes.
+  8. Once it's live, Render gives you a URL like:
+        https://tourism-backend-xxxx.onrender.com
+     Test it by opening https://tourism-backend-xxxx.onrender.com/actuator/health
+     in your browser - it should show {"status":"UP"}.
+
+  IMPORTANT - read this before you rely on the hosted backend:
+  Apache Derby, as used here, stores its database as files on the
+  server's local disk (in a "data" folder next to the running app).
+  Render's FREE web services do not include a persistent disk - the
+  filesystem is wiped every time the service restarts, redeploys, or
+  "spins down" after 15 minutes of no traffic and then wakes back up
+  on the next request. In practice this means:
+    - Every cold start reseeds the demo data fresh (fine for a demo).
+    - Any real bookings/accounts/reviews created by visitors will be
+      LOST the next time the service restarts or spins down.
+    - The first request after a period of inactivity will be slow
+      (30-60 seconds) while Render wakes the service back up.
+  This is a limitation of combining a file-based database with free,
+  ephemeral hosting - it is not a bug in the application. It's fine
+  for showing the project off, but not for real, persistent use.
+  If you need real persistence for free:
+    - Render's free PostgreSQL database tier is a common pairing, but
+      using it here would mean swapping Apache Derby for PostgreSQL,
+      which is a deliberate architecture change outside what this
+      project's specification (Derby-only) asked for.
+    - Alternatively, a paid Render plan lets you attach a persistent
+      disk, so Derby's files survive restarts.
+
+--------------------------------
+STEP B - Deploy the frontend to Vercel
+--------------------------------
+  1. Go to https://vercel.com and sign up / log in (GitHub login is
+     easiest).
+  2. Click "Add New..." -> "Project", and import the same GitHub
+     repository.
+  3. When asked to configure the project:
+        Root Directory:    tourism-frontend
+        Framework Preset:  Vite   (Vercel usually detects this
+                            automatically from package.json)
+        Build Command:     npm run build
+        Output Directory:  dist
+  4. Add an Environment Variable:
+        VITE_API_BASE_URL = https://tourism-backend-xxxx.onrender.com
+     (use the exact Render URL from Step A.8, with no trailing slash)
+  5. Click "Deploy". After a minute or two you'll get a URL like:
+        https://tourism-frontend-xxxx.vercel.app
+  6. A vercel.json file is already included in tourism-frontend/ that
+     tells Vercel to route all paths to index.html, which is required
+     for React Router's client-side routing to work correctly on
+     page refresh/deep links - you don't need to configure this
+     yourself.
+
+--------------------------------
+STEP C - Connect the two
+--------------------------------
+  Go back to Render and make sure APP_CORS_ALLOWED_ORIGINS (Step A.6)
+  exactly matches your real Vercel URL from Step B.5, then trigger a
+  manual redeploy on Render so the new setting takes effect. Without
+  this, the browser will block API requests from your Vercel site to
+  your Render backend (a CORS error in the browser console).
+
+  Once both are deployed and pointing at each other, open your Vercel
+  URL, log in with a demo account, and the whole flow (browse, book,
+  pay, cancel, review, operator/admin dashboards) will work exactly
+  as it does locally - keeping in mind the data-persistence caveat
+  above for the free Render tier.
+
+----------------------------------------------------------------
+QUICK REFERENCE
+----------------------------------------------------------------
+Local backend:    http://localhost:8080
+Local frontend:   http://localhost:5173
+Demo credentials: see DEMO_CREDENTIALS.md
+Backend health check (local or hosted): GET /actuator/health
+Reset local data: stop backend, delete tourism-backend/data, restart
+================================================================
