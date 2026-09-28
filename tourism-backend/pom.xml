@@ -47,12 +47,6 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- Hibernate 6 moved non-core dialects (Derby, etc.) into this module -->
-        <dependency>
-            <groupId>org.hibernate.orm</groupId>
-            <artifactId>hibernate-community-dialects</artifactId>
-        </dependency>
-
         <!-- Apache Derby - embedded, file-based, zero external DB server -->
         <dependency>
             <groupId>org.apache.derby</groupId>
